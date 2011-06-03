@@ -96,9 +96,11 @@
 		axisTickSize: 	5,
 		showLabels: 	true,
 		showLegend: 	true,
+		useHeadersForLegend: false,
 		legendPosition: '',
 		isStacked: 		false,
 		isDistribution: false,
+		displaySumAndPercentage: false,
 		barWidth: 		20,
 		barSpacing: 	2,
 		groupSpacing: 	10,
@@ -132,8 +134,35 @@
 				};
 				config.chd = 't:' + data.toString(',', '|');  // data
 				if (mySettings.showTitle) config.chtt = caption;
-				if (mySettings.showLegend) config.chdl = data.getValueRowHeaders().round(1).appendEach(mySettings.unit).join('|'); //legend
-				if (mySettings.showLabels) config.chl = data.getColumnHeaders().join('|');  // labels
+				
+				if (mySettings.showLegend) {
+					if (mySettings.useHeadersForLegend) {
+						config.chdl = data.getColumnHeaders().join('|'); //legend
+					} else {
+						config.chdl = data.getValueRowHeaders().round(1).appendEach(mySettings.unit).join('|'); //legend
+					}
+				}
+				
+				if (mySettings.showLabels) {
+					if (mySettings.useHeadersForLegend) {
+					
+						if (mySettings.displaySumAndPercentage) {
+							var totals = data.getValueRowHeaders();
+							var percentages = data.getValueRowHeaders().toPercentages().round(1);
+							
+							var labels = [];
+							for(var i = 0; i < totals.length; i++) {
+								labels[i] = percentages[i] + '% ' + mySettings.unit + totals[i];
+							}
+							config.chl = labels.join('|'); //labels
+						} else {
+							config.chl = data.getValueRowHeaders().round(1).appendEach(mySettings.unit).join('|'); //labels
+						}
+					} else {
+						config.chl = data.getColumnHeaders().join('|');  //labels
+					}
+				}
+				
 				if (mySettings.colors) config.chco = mySettings.colors.first(data.numColumns);  // colors
 				params = serialize(config);
 				table.after('<img class="'+mySettings.imageClass+'" src="http://chart.apis.google.com/chart?'+params+'" width="'+mySettings.chartWidth+'" height="'+mySettings.chartHeight+'" alt="'+caption+'" />');
@@ -452,4 +481,3 @@
 		return new tableData($(this), options);
 	};
 })( jQuery );
-
