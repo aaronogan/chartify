@@ -87,7 +87,7 @@
 		legendWidth: 	0,
 		legendHeight: 	0,
 		pieChartRotation: 0,
-		unit: 			'',
+
 		textSize:		11,
 		textColor:   	"666666",
 		colors: 		["ff9daa","ffc000","007ec6","433840","6cc05c","ff710f","ED1F27","95a8ad","0053aa"],
@@ -104,8 +104,10 @@
 		barWidth: 		20,
 		barSpacing: 	2,
 		groupSpacing: 	10,
-		imageClass: 	''
+		imageClass: 	'',
+		unit: 			''
 	};
+	
 	var methods = {
 		// getter / setter of global settings
 		settings : function (options) {
@@ -121,51 +123,10 @@
 			return this.each(function (){
 				var table = $(this);
 				var data = table.chartifyTableData({isDistribution: mySettings.isDistribution});
-				var caption = data.getCaption();
+				var pieChart = new chart(data, mySettings);
+				var imageTag = pieChart.getChart();
 				
-				var config = {
-					cht : mySettings.chartType ? mySettings.chartType : 'p',		// chart type
-					chs : '' + mySettings.chartWidth+'x' + mySettings.chartHeight,	// chart size
-					chp : mySettings.pieChartRotation,								// chart rotation
-					chdlp : mySettings.legendPosition,								// legend position
-					chdls : mySettings.textColor + ',' + mySettings.textSize,		// legend style
-					chts : mySettings.textColor + ',' + mySettings.textSize,		// legend style
-					chma : '' + mySettings.marginLeft + ',' + mySettings.marginRight + ',' + mySettings.marginTop + ',' + mySettings.marginBottom + '|' + mySettings.legendWidth + ',' + mySettings.legendHeight												// margins
-				};
-				config.chd = 't:' + data.toString(',', '|');  // data
-				if (mySettings.showTitle) config.chtt = caption;
-				
-				if (mySettings.showLegend) {
-					if (mySettings.useHeadersForLegend) {
-						config.chdl = data.getColumnHeaders().join('|'); //legend
-					} else {
-						config.chdl = data.getValueRowHeaders().round(1).appendEach(mySettings.unit).join('|'); //legend
-					}
-				}
-				
-				if (mySettings.showLabels) {
-					if (mySettings.useHeadersForLegend) {
-					
-						if (mySettings.displaySumAndPercentage) {
-							var totals = data.getValueRowHeaders();
-							var percentages = data.getValueRowHeaders().toPercentages().round(1);
-							
-							var labels = [];
-							for(var i = 0; i < totals.length; i++) {
-								labels[i] = percentages[i] + '% ' + mySettings.unit + totals[i];
-							}
-							config.chl = labels.join('|'); //labels
-						} else {
-							config.chl = data.getValueRowHeaders().round(1).appendEach(mySettings.unit).join('|'); //labels
-						}
-					} else {
-						config.chl = data.getColumnHeaders().join('|');  //labels
-					}
-				}
-				
-				if (mySettings.colors) config.chco = mySettings.colors.first(data.numColumns);  // colors
-				params = serialize(config);
-				table.after('<img class="'+mySettings.imageClass+'" src="http://chart.apis.google.com/chart?'+params+'" width="'+mySettings.chartWidth+'" height="'+mySettings.chartHeight+'" alt="'+caption+'" />');
+				table.after(imageTag);
 				table.attr("style", "position: absolute; left: -9999px;");
 			});
 		},
@@ -332,6 +293,64 @@
 		$.extend(s.colors, ArrayExtensions);
 		return s;
 	}
+	function chart(tableData, options) {
+		this.table = tableData;
+		this.googChartData = {
+			cht : options.chartType ? options.chartType : 'p', // chart type
+			chs : '' + options.chartWidth+'x'+ options.chartHeight, // chart size
+			chp : options.pieChartRotation, // chart rotation
+			chdlp : options.legendPosition, // legend position
+			chdls : options.textColor+','+options.textSize, // legend style
+			chts : options.textColor+','+options.textSize, // legend style
+			chma : ''+options.marginLeft+','+options.marginRight+','+options.marginTop+','+options.marginBottom+'|'+options.legendWidth+','+options.legendHeight, // margins
+			chd : 't:' + this.table.toString(',', '|')  // data
+		};
+		if (options.showTitle) this.googChartData.chtt = caption;
+		if (options.colors) this.googChartData.chco = options.colors.first(this.table.numColumns);  // colors
+		this.initLabels(options);
+		this.initLegend(options);
+		this.imageClass = options.imageClass;
+		this.width = options.chartWidth;
+		this.height = options.chartHeight;
+		this.caption = this.table.getCaption();
+	}
+	chart.prototype = {
+		initLabels: function (options) {
+			if (options.showLabels) {
+				if (options.useHeadersForLegend) {
+				
+					if (options.displaySumAndPercentage) {
+						var totals = this.table.getValueRowHeaders();
+						var percentages = this.table.getValueRowHeaders().toPercentages().round(1);
+						
+						var labels = [];
+						for(var i = 0; i < totals.length; i++) {
+							labels[i] = percentages[i] + '% ' + options.unit + totals[i];
+						}
+						this.googChartData.chl = labels.join('|'); //labels
+					} else {
+						this.googChartData.chl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|'); //labels
+					}
+				} else {
+					this.googChartData.chl = this.table.getColumnHeaders().join('|');  //labels
+				}
+			}
+		},
+		initLegend: function (options) {
+			if (options.showLegend) {
+				if (options.useHeadersForLegend) {
+					this.googChartData.chdl = this.table.getColumnHeaders().join('|'); //legend
+				} else {
+					this.googChartData.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|'); //legend
+				}
+			}
+		},
+		getChart: function() {
+			var params = serialize(this.googChartData);
+			var imageTag = '<img class="'+this.imageClass+'" src="http://chart.apis.google.com/chart?'+params+'" width="'+this.width+'" height="'+this.height+' alt="'+this.caption+'" />';
+			return imageTag;
+		}
+	};
 	function tableData (table, options) {
 		var settings = {
 			isStacked : false,
