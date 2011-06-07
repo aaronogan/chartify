@@ -19,12 +19,12 @@
 	<script type="text/javascript" src="javascripts/chartify.js"></script>
 	<script type="text/javascript">
 	$(document).ready(function () {
-	  $('.pie-chart').chartify('pie', {chartType: 'p3', unit: '%', isDistribution: true});
-	  $('.bar-chart').chartify('bar', {legendPosition: 'b'});
-	  $('.bar-chart-1').chartify('bar', {marginLeft: 128, legendPosition: 'r', showLegend: false, unit: '%'});
-	  $('.bar-chart-3').chartify('bar', {isDistribution: true, unit: '%'});
-	  $('.bar-chart-2').chartify('bar', {legendPosition: 'b', isDistribution: true, isStacked: true, showLabels: false, unit: '%'});
-	  $('.venn-diagram').chartify('venn', {colors: ["ff000080", "00ff0080", "0000ff80"]});
+	  $('.pie-chart').chartify('pie3d', { unit: '%', legendType: 'percentage', isDistribution: true });
+	  $('.bar-chart').chartify('bar', { legendType: 'percentage', legendPosition: 'b' });
+	  $('.bar-chart-1').chartify('bar', { marginLeft: 128, legendPosition: 'r', legendType: 'none', unit: '%' });
+	  $('.bar-chart-3').chartify('bar', { isDistribution: true, unit: '%', legendType: 'sum' });
+	  $('.bar-chart-2').chartify('bar', { legendPosition: 'b', legendType: 'percentage', isDistribution: true, isStacked: true, showLabels: false, unit: '%' });
+	  $('.venn-diagram').chartify('venn', { legendType: 'sum', colors: ["ff000080", "00ff0080", "0000ff80"] });
 	  $('.gender-chart').chartify('gender');
 	});
 	</script>

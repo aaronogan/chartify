@@ -74,8 +74,8 @@
 			return arr;
 		}
 	};
-	jQuery.extend(String.prototype, {toString : function () {return this;}});
-
+	jQuery.extend(String.prototype, { toString : function () { return this; } });
+	
 	// default global settings
 	var settings = {
 		chartWidth:  	496, // in pixels
@@ -87,7 +87,7 @@
 		legendWidth: 	0,
 		legendHeight: 	0,
 		pieChartRotation: 0,
-
+		
 		textSize:		11,
 		textColor:   	"666666",
 		colors: 		["ff9daa","ffc000","007ec6","433840","6cc05c","ff710f","ED1F27","95a8ad","0053aa"],
@@ -96,16 +96,15 @@
 		axisTickSize: 	5,
 		showLabels: 	true,
 		showLegend: 	true,
-		useHeadersForLegend: false,
 		legendPosition: '',
 		isStacked: 		false,
 		isDistribution: false,
-		displaySumAndPercentage: false,
 		barWidth: 		20,
 		barSpacing: 	2,
 		groupSpacing: 	10,
 		imageClass: 	'',
-		unit: 			''
+		unit: 			'',
+		legendType:     'none' // options are 'none', 'header', 'sum', or 'percentage'
 	};
 	
 	var methods = {
@@ -120,112 +119,52 @@
 		},
 		pie : function (options) {
 			var mySettings = getSettings(options);
-			return this.each(function (){
+			return this.each(function () {
 				var table = $(this);
-				var data = table.chartifyTableData({isDistribution: mySettings.isDistribution});
-				var pieChart = new chart(data, mySettings);
-				var imageTag = pieChart.getChart();
+				var data = table.chartifyTableData({ isDistribution: mySettings.isDistribution });
+				var chart = new PieChart();
+				var imgUrl = chart.getImageUrl(data, mySettings);
 				
-				table.after(imageTag);
+				table.after('<img class="' + mySettings.imageClass + '" src="' + imgUrl + '" width="' + mySettings.chartWidth + '" height="' + mySettings.chartHeight + '" alt="" />');
+				table.attr("style", "position: absolute; left: -9999px;");
+			});
+		},
+		pie3d : function (options) {
+			var mySettings = getSettings(options);
+			return this.each(function () {
+				var table = $(this);
+				var data = table.chartifyTableData({ isDistribution: mySettings.isDistribution });
+				var chart = new PieChart3d();
+				var imgUrl = chart.getImageUrl(data, mySettings);
+				
+				table.after('<img class="' + mySettings.imageClass + '" src="' + imgUrl + '" width="' + mySettings.chartWidth + '" height="' + mySettings.chartHeight + '" alt="" />');
 				table.attr("style", "position: absolute; left: -9999px;");
 			});
 		},
 		bar : function (options) {
 			var mySettings = getSettings(options);
-			return this.each(function (){
+			return this.each(function () {
 				var table = $(this);
-				var data = table.chartifyTableData(mySettings);
-				var caption = data.getCaption();
+				var data = table.chartifyTableData({ isDistribution: mySettings.isDistribution });
+				var chart = new BarChart();
+				var imgUrl = chart.getImageUrl(data, mySettings);
 				
-				var isGrouped = !mySettings.isStacked && data.numRows > 1;
-				var numGroups = isGrouped ? data.numRows : 1;
-				var groupHeight = mySettings.barWidth * numGroups + mySettings.barSpacing * (numGroups - 1);
-				var numMargins = mySettings.showLegend && mySettings.legendPosition.match(/^(b|t)/) ? 2 : 1; // 1 margin if no legend at top/bottom, 2 otherwise.
-				var height;
-				if (isGrouped) {
-					height = groupHeight * data.numColumns + mySettings.groupSpacing * (data.numColumns - 1) + numMargins * 20 + mySettings.textSize;
-				} else {
-					height = data.numColumns * (groupHeight + mySettings.barSpacing) - mySettings.barSpacing + numMargins * 20 + mySettings.textSize;
-				}
-				var config = {
-					chxs : '0,' + mySettings.textColor + ',' + mySettings.textSize + ',0,lt,' + mySettings.textColor + '|0,' + mySettings.textColor + ',' + mySettings.textSize + ',0,lt,'+ mySettings.textColor,
-					chxt : 'x,y',													// axis
-					cht : isGrouped ? 'bhg' : 'bhs',								// chart type
-					chs : ''+mySettings.chartWidth+'x' + height,					// size
-					chxtc : '0,'+mySettings.axisTickSize+'|1,'+mySettings.axisTickSize, // ticks style
-					chdlp : mySettings.legendPosition,								// legend position
-					chdls : mySettings.textColor + ',' + mySettings.textSize,		// legend style
-					chbh : mySettings.barWidth.toString() + ','+mySettings.barSpacing+',' + mySettings.groupSpacing, // bar width, spacing
-					chma : '' + mySettings.marginLeft + ',' + mySettings.marginRight + ',' + mySettings.marginTop + ',' + mySettings.marginBottom + '|' + mySettings.legendWidth + ',' + mySettings.legendHeight												// margins
-				};
-				config.chd = 't:' + data.toString(',', '|');
-
-				if (mySettings.showTitle) config.chtt = caption;
-
-				if (mySettings.colors) config.chco = mySettings.colors.first(data.numRows).join(',');
-				if (mySettings.showLabels) {
-					var chm = '';
-					for(var i = 0; i < data.numRows; i++) {
-						if (i > 0) chm += '|';
-						chm += 'N*0*'+mySettings.unit+','+mySettings.textColor+','+i+',-1,' + mySettings.textSize + ",0,r:-3:0";   // bar labels
-					}
-					config.chm = chm;
-				}
-				if (mySettings.showLegend) config.chdl = data.getRowHeaders().join('|'); // legend
-
-				var maxXValue, minXValue, xAxisStep;
-
-				if (mySettings.xAxisBoundaries == "auto") {
-					minXValue = 0;
-					maxXValue = Math.round(data.getMax(mySettings));
-					var xAxisPadding = mySettings.isStacked && mySettings.isDistribution ? 0 : 1;
-					xAxisStep = mySettings.xAxisStep == "auto" ? getAxisStep(minXValue, maxXValue) : mySettings.xAxisStep;
-					maxXValue += xAxisPadding * xAxisStep;
-				} else {
-					minXValue = mySettings.xAxisBoundaries[0];
-					maxXValue = mySettings.xAxisBoundaries[1];
-					xAxisStep = mySettings.xAxisStep == "auto" ? getAxisStep(minXValue, maxXValue) : mySettings.xAxisStep;
-				}
-				
-				var xAxisLabels = getAxisLabels(minXValue, maxXValue, xAxisStep);
-				var yAxisLabels = data.getColumnHeaders().reverse();
-
-				var xMax = xAxisLabels[xAxisLabels.length - 1];
-				if (mySettings.unit) xAxisLabels = xAxisLabels.appendEach(mySettings.unit);
-				config.chxl = '0:|'+xAxisLabels.join('|')+'|1:|'+yAxisLabels.join('|');  // labels
-
-				config.chxr = '0,0,'+xMax+'|1,0,0';		// scale axis
-				config.chds = '0,' + xMax;				// scale chart
-
-				params = serialize(config);
-				table.after('<img class="'+mySettings.imageClass+'" src="http://chart.apis.google.com/chart?'+params+'" width="'+mySettings.chartWidth+'" height="'+height+'" alt="'+caption+'" />');    
+				table.after('<img class="' + mySettings.imageClass + '" src="' + imgUrl + '" alt="" />');
 				table.attr("style", "position: absolute; left: -9999px;");
 			});
 		},
 		venn : function (options) {
 			var mySettings = getSettings(options);
-			return this.each(function (){
+			return this.each(function () {
 				var table = $(this);
 				var data = table.chartifyTableData();
-				var caption = data.getCaption();
-				var max = data.getMax();
-				var config = {
-					chs : '' + mySettings.chartWidth + 'x' + mySettings.chartHeight, // size
-					cht : 'v',
-					chdlp : mySettings.legendPosition,								// legend position
-					chdls : mySettings.textColor + ',' + mySettings.textSize,		// legend style
-					chma : '' + mySettings.marginLeft + ',' + mySettings.marginRight + ',' + mySettings.marginTop + ',' + mySettings.marginBottom + '|' + mySettings.legendWidth + ',' + mySettings.legendHeight // margins
-				};
-				config.chd = 't:' + data.toString(',', '|');  // data
-				if (mySettings.colors) config.chco = mySettings.colors.first(data.numColumns).join(',');
-				if (mySettings.showLegend) config.chdl = data.getColumnHeaders().join('|');   // legend
-
-				var params = serialize(config);
-				table.after('<img class="'+mySettings.imageClass+'" src="http://chart.apis.google.com/chart?'+params+'" width="'+mySettings.chartWidth+'" height="'+mySettings.chartHeight+'" alt="'+caption+'" />');    
+				var chart = new VennDiagram();
+				var imgUrl = chart.getImageUrl(data, mySettings);
+				
+				table.after('<img class="' + mySettings.imageClass + '" src="' + imgUrl + '" width="' + mySettings.chartWidth + '" height="' + mySettings.chartHeight + '" alt="" />');
 				table.attr("style", "position: absolute; left: -9999px;");
 			});
 		},
-		// TODO: change this to handle any number of categories
 		gender : function (options) {
 			var mySettings = getSettings(options);
 			$.extend(mySettings, {
@@ -263,6 +202,206 @@
 			});
 		}
 	};
+	
+	function Chart() { }
+	
+	Chart.prototype = {
+		init: function (tableData, options) {
+			this.table = tableData;
+			
+			this.width = options.chartWidth;
+			this.height = options.chartHeight;
+			
+			this.params = {
+				chs : '' + options.chartWidth+'x' + options.chartHeight, // size
+				chdlp : options.legendPosition, // legend position
+				chdls : options.textColor + ',' + options.textSize, // legend style
+				chma : '' + options.marginLeft + ',' + options.marginRight + ',' + options.marginTop + ',' + options.marginBottom + '|' + options.legendWidth + ',' + options.legendHeight, // margins
+				chd : 't:' + this.table.toString(',', '|'), // data
+				chco : options.colors.first(this.table.numColumns) // colors
+			};
+			
+			this.initChartType(options);
+			this.initLegend(options);
+			this.initLabels(options);
+		},
+		initCaption: function (options) {
+			if (options.showTitle) {
+				this.params.chtt = this.table.getCaption();
+			}
+		},
+		initChartType: function (options) {
+			this.params.cht = 'p';
+		},
+		initLegend: function (options) {
+			if (options.legendType === 'header') {
+				this.params.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
+			} else if (options.legendType === 'sum') {
+				this.params.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
+			} else if (options.legendType === 'percentage') {
+				this.params.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
+			}
+		},
+		getImageUrl: function (tableData, options) {
+			this.init(tableData, options);
+			return 'http://chart.apis.google.com/chart?' + serialize(this.params);
+		}
+	};
+	
+	
+	function PieChart() { }
+	
+	PieChart.prototype = new Chart();
+	
+	PieChart.prototype.init = function (tableData, options) {
+		Chart.prototype.init.call(this, tableData, options);
+		
+		this.params.chp = options.pieChartRotation;
+		this.params.chts = options.textColor + ',' + options.textSize; //legend style
+	}
+	
+	PieChart.prototype.initLabels = function (options) {
+		if (options.showLabels) {
+			if (options.useHeadersForLegend) {
+			
+				if (options.displaySumAndPercentage) {
+					var totals = this.table.getValueRowHeaders();
+					var percentages = this.table.getValueRowHeaders().toPercentages().round(1);
+					
+					var labels = [];
+					for(var i = 0; i < totals.length; i++) {
+						labels[i] = percentages[i] + '% ' + options.unit + totals[i];
+					}
+					this.params.chl = labels.join('|');
+				} else {
+					this.params.chl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
+				}
+			} else {
+				this.params.chl = this.table.getColumnHeaders().join('|');
+			}
+		}
+	}
+	
+	
+	function PieChart3d() { }
+	
+	PieChart3d.prototype = new PieChart();
+	
+	PieChart.prototype.initChartType = function (options) {
+		this.params.cht = 'p3';
+	}
+	
+	function BarChart() { }
+	
+	BarChart.prototype = new Chart();
+	
+	BarChart.prototype.init = function (tableData, options) {
+		Chart.prototype.init.call(this, tableData, options);
+		
+		this.params.chxs = '0,' + options.textColor + ',' + options.textSize + ',0,lt,' + options.textColor + '|0,' + options.textColor + ',' + options.textSize + ',0,lt,'+ options.textColor; //
+		this.params.chxt = 'x,y'; //axis
+		this.params.chxtc = '0,' + options.axisTickSize + '|1,' + options.axisTickSize; // tick style
+		this.params.chbh = options.barWidth.toString() + ',' + options.barSpacing + ',' + options.groupSpacing; // bar width, spacing
+		
+		this.isGrouped = !options.isStacked && this.table.numRows > 1;
+		this.initChartType(options);
+		
+		this.initDimensions(options);
+		this.initAxes(options);
+	}
+	
+	BarChart.prototype.initChartType = function (options) {
+		this.params.cht = this.isGrouped ? 'bhg' : 'bhs';
+	}
+	
+	BarChart.prototype.initLabels = function (options) {
+		if (options.showLabels) {
+			var chm = '';
+			for(var i = 0; i < this.table.numRows; i++) {
+				if (i > 0) chm += '|';
+				chm += 'N*0*' + options.unit + ',' + options.textColor + ',' + i + ',-1,' + options.textSize + ",0,r:-3:0";
+			}
+			this.params.chm = chm;
+		}
+	}
+	
+	BarChart.prototype.initLegend = function (options) {
+		if (options.legendType === 'header') {
+			this.params.chdl = this.table.getRowHeaders().join('|');
+		} else if (options.legendType === 'sum') {
+			this.params.chdl = this.table.getRowHeaders().join('|');
+		} else if (options.legendType === 'percentage') {
+			this.params.chdl = this.table.getRowHeaders().join('|');
+		}
+	}
+	
+	BarChart.prototype.initDimensions = function (options) {
+		var numGroups = this.isGrouped ? this.table.numRows : 1;
+		var groupHeight = options.barWidth * numGroups + options.barSpacing * (numGroups - 1);
+		var numMargins = options.showLegend && options.legendPosition.match(/^(b|t)/) ? 2 : 1; // 1 margin if no legend at top/bottom, 2 otherwise.
+		if (this.isGrouped) {
+			this.height = groupHeight * this.table.numColumns + options.groupSpacing * (this.table.numColumns - 1) + numMargins * 20 + options.textSize;
+		} else {
+			this.height = this.table.numColumns * (groupHeight + options.barSpacing) - options.barSpacing + numMargins * 20 + options.textSize;
+		}
+		
+		this.params.chs = '' + this.width + 'x' + this.height;
+	}
+	
+	BarChart.prototype.initAxes = function (options) {
+		var maxXValue, minXValue, xAxisStep;
+		
+		if (options.xAxisBoundaries == 'auto') {
+			minXValue = 0;
+			maxXValue = Math.round(this.table.getMax(options));
+			var xAxisPadding = options.isStacked && options.isDistribution ? 0 : 1;
+			xAxisStep = options.xAxisStep == 'auto' ? getAxisStep(minXValue, maxXValue) : options.xAxisStep;
+			maxXValue += xAxisPadding * xAxisStep;
+		} else {
+			minXValue = options.xAxisBoundaries[0];
+			maxXValue = options.xAxisBoundaries[1];
+			xAxisStep = options.xAxisStep == 'auto' ? getAxisStep(minXValue, maxXValue) : options.xAxisStep;
+		}
+		
+		var xAxisLabels = getAxisLabels(minXValue, maxXValue, xAxisStep);
+		var yAxisLabels = this.table.getColumnHeaders().reverse();
+
+		var xMax = xAxisLabels[xAxisLabels.length - 1];
+		if (options.unit) xAxisLabels = xAxisLabels.appendEach(options.unit);
+		this.params.chxl = '0:|' + xAxisLabels.join('|') + '|1:|' + yAxisLabels.join('|');  // labels
+
+		this.params.chxr = '0,0,' + xMax + '|1,0,0'; // scale axis
+		this.params.chds = '0,' + xMax; // scale chart
+	}
+	
+	
+	function VennDiagram() { }
+	
+	VennDiagram.prototype = new Chart();
+	
+	VennDiagram.prototype.init = function (tableData, options) {
+		Chart.prototype.init.call(this, tableData, options);
+	}
+	
+	VennDiagram.prototype.initChartType = function (options) {
+		this.params.cht = 'v';
+	}
+	
+	VennDiagram.prototype.initLabels = function (options) {
+		
+	}
+	
+	VennDiagram.prototype.initLegend = function (options) {
+		if (options.legendType === 'header') {
+			this.params.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
+		} else if (options.legendType === 'sum') {
+			this.params.chdl = this.table.getColumnHeaders().join('|');
+		} else if (options.legendType === 'percentage') {
+			this.params.chdl = this.table.getColumnHeaders().join('|');
+		}
+	}
+	
+	
 	function getAxisLabels (minValue, maxValue, step) {
 		var arr = [];
 		$.extend(arr, ArrayExtensions);
@@ -293,64 +432,6 @@
 		$.extend(s.colors, ArrayExtensions);
 		return s;
 	}
-	function chart(tableData, options) {
-		this.table = tableData;
-		this.googChartData = {
-			cht : options.chartType ? options.chartType : 'p', // chart type
-			chs : '' + options.chartWidth+'x'+ options.chartHeight, // chart size
-			chp : options.pieChartRotation, // chart rotation
-			chdlp : options.legendPosition, // legend position
-			chdls : options.textColor+','+options.textSize, // legend style
-			chts : options.textColor+','+options.textSize, // legend style
-			chma : ''+options.marginLeft+','+options.marginRight+','+options.marginTop+','+options.marginBottom+'|'+options.legendWidth+','+options.legendHeight, // margins
-			chd : 't:' + this.table.toString(',', '|')  // data
-		};
-		if (options.showTitle) this.googChartData.chtt = caption;
-		if (options.colors) this.googChartData.chco = options.colors.first(this.table.numColumns);  // colors
-		this.initLabels(options);
-		this.initLegend(options);
-		this.imageClass = options.imageClass;
-		this.width = options.chartWidth;
-		this.height = options.chartHeight;
-		this.caption = this.table.getCaption();
-	}
-	chart.prototype = {
-		initLabels: function (options) {
-			if (options.showLabels) {
-				if (options.useHeadersForLegend) {
-				
-					if (options.displaySumAndPercentage) {
-						var totals = this.table.getValueRowHeaders();
-						var percentages = this.table.getValueRowHeaders().toPercentages().round(1);
-						
-						var labels = [];
-						for(var i = 0; i < totals.length; i++) {
-							labels[i] = percentages[i] + '% ' + options.unit + totals[i];
-						}
-						this.googChartData.chl = labels.join('|'); //labels
-					} else {
-						this.googChartData.chl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|'); //labels
-					}
-				} else {
-					this.googChartData.chl = this.table.getColumnHeaders().join('|');  //labels
-				}
-			}
-		},
-		initLegend: function (options) {
-			if (options.showLegend) {
-				if (options.useHeadersForLegend) {
-					this.googChartData.chdl = this.table.getColumnHeaders().join('|'); //legend
-				} else {
-					this.googChartData.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|'); //legend
-				}
-			}
-		},
-		getChart: function() {
-			var params = serialize(this.googChartData);
-			var imageTag = '<img class="'+this.imageClass+'" src="http://chart.apis.google.com/chart?'+params+'" width="'+this.width+'" height="'+this.height+' alt="'+this.caption+'" />';
-			return imageTag;
-		}
-	};
 	function tableData (table, options) {
 		var settings = {
 			isStacked : false,
@@ -499,4 +580,4 @@
 	$.fn.chartifyTableData = function (options) {
 		return new tableData($(this), options);
 	};
-})( jQuery );
+})(jQuery);
