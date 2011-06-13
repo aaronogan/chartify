@@ -34,7 +34,7 @@
 				precisionFactor = precisionFactor * 10;
 			}
 			arr = [];
-			jQuery.extend(arr, ArrayExtensions);
+			$.extend(arr, ArrayExtensions);
 			for(var i = 0; i < this.length; i++) {
 				arr[i] = Math.round(precisionFactor * this[i]) / precisionFactor;
 			}
@@ -49,7 +49,7 @@
 		first : function (num) {
 			var num = num || 1;
 			var arr = [];
-			jQuery.extend(arr, ArrayExtensions);
+			$.extend(arr, ArrayExtensions);
 			for(var i = 0; i < Math.min(this.length, num); i++) {
 				arr[i] = this[i];
 			}
@@ -58,7 +58,7 @@
 		last : function (num) {
 			var num = num || 1;
 			var arr = [];
-			jQuery.extend(arr, ArrayExtensions);
+			$.extend(arr, ArrayExtensions);
 			for(var i = 0; i < Math.min(this.length, num); i++) {
 				arr[i] = this[this.length - 1 - i];
 			}
@@ -66,7 +66,7 @@
 		},
 		toPercentages : function () {
 			var arr = [];
-			jQuery.extend(arr, ArrayExtensions);
+			$.extend(arr, ArrayExtensions);
 			var sum = this.sum();
 			for(var i = 0; i < this.length; i++) {
 				arr[i] = 100 * this[i] / sum;
@@ -74,7 +74,7 @@
 			return arr;
 		}
 	};
-	jQuery.extend(String.prototype, { toString : function () { return this; } });
+	$.extend(String.prototype, { toString : function () { return this; } });
 	
 	// default global settings
 	var settings = {
@@ -104,6 +104,7 @@
 		groupSpacing: 	10,
 		imageClass: 	'',
 		unit: 			'',
+		labelType:      '', // options are 'none', 'columnHeaders', 'rowHeaders'
 		legendType:     'none' // options are 'none', 'header', 'sum', or 'percentage'
 	};
 	
@@ -205,48 +206,56 @@
 	
 	function Chart() { }
 	
-	Chart.prototype = {
-		init: function (tableData, options) {
-			this.table = tableData;
-			
-			this.width = options.chartWidth;
-			this.height = options.chartHeight;
-			
-			this.params = {
-				chs : '' + options.chartWidth+'x' + options.chartHeight, // size
-				chdlp : options.legendPosition, // legend position
-				chdls : options.textColor + ',' + options.textSize, // legend style
-				chma : '' + options.marginLeft + ',' + options.marginRight + ',' + options.marginTop + ',' + options.marginBottom + '|' + options.legendWidth + ',' + options.legendHeight, // margins
-				chd : 't:' + this.table.toString(',', '|'), // data
-				chco : options.colors.first(this.table.numColumns) // colors
-			};
-			
-			this.initChartType(options);
-			this.initLegend(options);
-			this.initLabels(options);
-		},
-		initCaption: function (options) {
-			if (options.showTitle) {
-				this.params.chtt = this.table.getCaption();
-			}
-		},
-		initChartType: function (options) {
-			this.params.cht = 'p';
-		},
-		initLegend: function (options) {
-			if (options.legendType === 'header') {
-				this.params.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
-			} else if (options.legendType === 'sum') {
-				this.params.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
-			} else if (options.legendType === 'percentage') {
-				this.params.chdl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
-			}
-		},
-		getImageUrl: function (tableData, options) {
-			this.init(tableData, options);
-			return 'http://chart.apis.google.com/chart?' + serialize(this.params);
+	Chart.prototype.init = function (tableData, options) {
+		this.table = tableData;
+		
+		this.width = options.chartWidth;
+		this.height = options.chartHeight;
+		
+		this.params = {
+			chs : '' + options.chartWidth + 'x' + options.chartHeight, // size
+			chdlp : options.legendPosition, // legend position
+			chdls : options.textColor + ',' + options.textSize, // legend style
+			chma : '' + options.marginLeft + ',' + options.marginRight + ',' + options.marginTop + ',' + options.marginBottom + '|' + options.legendWidth + ',' + options.legendHeight, // margins
+			chd : 't:' + this.table.toString(',', '|'), // data
+			chco : options.colors.first(this.table.numColumns) // colors
+		};
+		
+		this.initChartType(options);
+		this.initLegend(options);
+		this.initLabels(options);
+	}
+	
+	Chart.prototype.initCaption = function (options) {
+		if (options.showTitle) {
+			this.params.chtt = this.table.getCaption();
 		}
-	};
+	}
+	
+	Chart.prototype.initChartType = function (options) {
+		this.params.cht = 'p';
+	}
+	
+	Chart.prototype.initLegend = function (options) {
+		if (options.legendType != 'none') {
+			var formatter = new LabelFormatter(this.table);
+			var legend = formatter.format(options.legendType);
+			this.params.chdl = legend.join('|');
+		}
+	}
+	
+	Chart.prototype.initLabels = function (options) {
+		if (options.showLabels) {
+			var formatter = new LabelFormatter(this.table);
+			var newLabels = formatter.format(options.labelType);
+			this.params.chl = newLabels.join('|');
+		}
+	}
+	
+	Chart.prototype.getImageUrl = function (tableData, options) {
+		this.init(tableData, options);
+		return 'https://chart.googleapis.com/chart?' + serialize(this.params);
+	}
 	
 	
 	function PieChart() { }
@@ -260,34 +269,12 @@
 		this.params.chts = options.textColor + ',' + options.textSize; //legend style
 	}
 	
-	PieChart.prototype.initLabels = function (options) {
-		if (options.showLabels) {
-			if (options.useHeadersForLegend) {
-			
-				if (options.displaySumAndPercentage) {
-					var totals = this.table.getValueRowHeaders();
-					var percentages = this.table.getValueRowHeaders().toPercentages().round(1);
-					
-					var labels = [];
-					for(var i = 0; i < totals.length; i++) {
-						labels[i] = percentages[i] + '% ' + options.unit + totals[i];
-					}
-					this.params.chl = labels.join('|');
-				} else {
-					this.params.chl = this.table.getValueRowHeaders().round(1).appendEach(options.unit).join('|');
-				}
-			} else {
-				this.params.chl = this.table.getColumnHeaders().join('|');
-			}
-		}
-	}
-	
 	
 	function PieChart3d() { }
 	
 	PieChart3d.prototype = new PieChart();
 	
-	PieChart.prototype.initChartType = function (options) {
+	PieChart3d.prototype.initChartType = function (options) {
 		this.params.cht = 'p3';
 	}
 	
@@ -401,6 +388,68 @@
 		}
 	}
 	
+	function LabelFormatter(tableData) {
+		this.columnHeaders = tableData.getColumnHeaders();
+		this.rowHeaders = tableData.getRowHeaders();
+		this.sums = tableData.getColumnSums();
+		this.distributions = tableData.getDistributionByRow();
+		
+		// d for distribution
+		// l for literal
+		// s for sum
+		// r for row header
+		// c for column header
+		var knownFormats = {
+			distribution : '{d}{l:%}',
+			sum : '{s}',
+			rowHeader : '{r}',
+			columnHeader : '{c}',
+			extended : '{d}{l:%} {l:$}{s}'
+		};
+		
+		this.format = function (patternName) {
+			var pattern = knownFormats[patternName] || knownFormats['columnHeader'];
+			return this.customFormat(pattern);
+		}
+		
+		this.customFormat = function (pattern) {
+			var results = [];
+			var x = this.rowHeaders.length;
+			var y = this.columnHeaders.length;
+			// TODO: Mechanism for determining which axis to use.
+			for (var i = 0; i < y; i++) {
+				var result = customFormatString(pattern, this.columnHeaders[i], this.rowHeaders[i], this.sums[i], this.distributions[i]);
+				results.push(result);
+			}
+			return results;
+		}
+		
+		var customFormatString = function (pattern, columnHeader, rowHeader, sum, distribution) {
+			var result = pattern;
+			
+			var regex = /{.?:?.*?}/g;
+			var matches;
+			while ((matches = regex.exec(pattern)) != null) {
+				var parts = matches[0].replace('{', '').replace('}', '').split(':');
+				if (parts.length == 2 && parts[0] === 'l') {
+					result = result.replace(matches[0], parts[1]); // replace literal
+				} else if (parts.length == 1) {
+					if (parts[0] === 'r') {
+						result = result.replace(matches[0], rowHeader);
+					} else if (parts[0] === 'd') {
+						result = result.replace(matches[0], distribution);
+					} else if (parts[0] === 's') {
+						result = result.replace(matches[0], sum);
+					} else if (parts[0] === 'c') {
+						result = result.replace(matches[0], columnHeader);
+					}
+				}
+			}
+			//console.log(result);
+			return result;
+		}
+	}
+	
 	
 	function getAxisLabels (minValue, maxValue, step) {
 		var arr = [];
@@ -432,7 +481,8 @@
 		$.extend(s.colors, ArrayExtensions);
 		return s;
 	}
-	function tableData (table, options) {
+	
+	function TableData (table, options) {
 		var settings = {
 			isStacked : false,
 			isDistribution : false
@@ -441,7 +491,7 @@
 			$.extend(settings, options);
 		}
 		this.table = $(table);
-		this.caption = this.table.find("caption").html() || '';
+		this.caption = this.table.find('caption').html() || '';
 		this.numRows = 0;
 		this.numColumns = 0;
 		this.rows = {};
@@ -451,123 +501,178 @@
 		this.initColumns();
 		this.initRows(settings);
 	}
-	tableData.prototype = {
-		initColumns: function () {
-	    	var tmpVerboseColumnHeaders = {};
-			var tmpColumnHeaders = [];
-			this.table.find("thead th").each(function(index, element) {
-				var content = $(element).html();
-				if (content.length > 0) {
-					var abbr = $(element).attr("abbr");
-					if (!abbr) abbr = content;
-					tmpVerboseColumnHeaders[abbr] = content;
-					tmpColumnHeaders.push(abbr);
-				}
-			});
-			this.verboseColumnHeaders = tmpVerboseColumnHeaders;
-			this.columnHeaders = tmpColumnHeaders;
-			this.numColumns = this.columnHeaders.length;
-			return this;
-		},
-		initRows: function (options) {
-			var options = options || {};
-			var tmpRows = {};
-			var tmpRowHeaders = [];
-			this.table.find("tbody tr").each(function (i, row) {
-				var arr = [];
-				jQuery.extend(arr, ArrayExtensions);
-				$(row).find("td").each(function(j, cell) {
-					arr.push(parseFloat($(cell).html()));
-				});
-				if (!options.isStacked && options.isDistribution) {
-					arr = arr.toPercentages();
-				}
-				var header = $(row).find("th").html() || 'data';
-				tmpRowHeaders.push(header);
-				tmpRows[header] = arr;
-			});
-			if (options.isStacked && options.isDistribution) {
-				for (var col = 0; col < this.numColumns; col++) {
-					var sum = 0;
-					for(var row = 0; row < tmpRowHeaders.length; row++) {
-						sum += tmpRows[tmpRowHeaders[row]][col];
-					}
-					for(var row = 0; row < tmpRowHeaders.length; row++) {
-						tmpRows[tmpRowHeaders[row]][col] = 100 * tmpRows[tmpRowHeaders[row]][col] / sum;
-					}
-				}
+	
+	TableData.prototype.initColumns = function () {
+		var tmpVerboseColumnHeaders = {};
+		var tmpColumnHeaders = [];
+		this.table.find("thead th").each(function(index, element) {
+			var content = $(element).html();
+			if (content.length > 0) {
+				var abbr = $(element).attr("abbr");
+				if (!abbr) abbr = content;
+				tmpVerboseColumnHeaders[abbr] = content;
+				tmpColumnHeaders.push(abbr);
 			}
-			this.rowHeaders = tmpRowHeaders;
-			this.rows = tmpRows;
-			this.numRows = this.rowHeaders.length;
-			return this;
-		},
-		toString: function (colSep, rowSep) {
+		});
+		this.verboseColumnHeaders = tmpVerboseColumnHeaders;
+		this.columnHeaders = tmpColumnHeaders;
+		this.numColumns = this.columnHeaders.length;
+		return this;
+	}
+	
+	TableData.prototype.initRows = function (options) {
+		var options = options || {};
+		var tmpRows = {};
+		var tmpRowHeaders = [];
+		this.table.find("tbody tr").each(function (i, row) {
 			var arr = [];
-			jQuery.extend(arr, ArrayExtensions);
-			for (var key in this.rows) {
-				arr.push(this.rows[key].round(1).join(colSep));
+			$.extend(arr, ArrayExtensions);
+			$(row).find("td").each(function(j, cell) {
+				arr.push(parseFloat($(cell).html()));
+			});
+			if (!options.isStacked && options.isDistribution) {
+				arr = arr.toPercentages();
 			}
-			return arr.join(rowSep);
-		},
-		getMax: function (options) {
-			var options = options || {};
-			if (options.isStacked) {
-				var globalMax = 0;
-				for (var i = 0; i < this.numColumns; i++) {
-					var sum = 0;
-					for (var key in this.rows) {
-						sum += this.rows[key][i];
-					}
-					if (sum > globalMax) globalMax = sum;
+			var header = $(row).find("th").html() || 'data';
+			tmpRowHeaders.push(header);
+			tmpRows[header] = arr;
+		});
+		if (options.isStacked && options.isDistribution) {
+			for (var col = 0; col < this.numColumns; col++) {
+				var sum = 0;
+				for(var row = 0; row < tmpRowHeaders.length; row++) {
+					sum += tmpRows[tmpRowHeaders[row]][col];
 				}
-				return globalMax;
-			} else {
-				var i = 0;
-				var globalMax;
-				for (var key in this.rows) {
-					var localMax = this.rows[key].max();
-					if (i == 0) {
-						globalMax = localMax;
-					} else if (localMax > globalMax) {
-						globalMax = localMax;
-					}
-					i++;
+				for(var row = 0; row < tmpRowHeaders.length; row++) {
+					tmpRows[tmpRowHeaders[row]][col] = 100 * tmpRows[tmpRowHeaders[row]][col] / sum;
 				}
-				return globalMax;
 			}
-		},
-		getColumnHeaders: function () {
-			return this.columnHeaders;
-		},
-		getRowHeaders: function () {
-			return this.rowHeaders;
-		},
-		getValueRowHeaders: function () {
-			return this.rows[this.rowHeaders[0]];
-		},
-		getColumnHeadersIndices: function () {
-			var obj = {};
-			for (var i = 0; i < this.numColumns; i++) {
-				obj[this.columnHeaders[i]] = i;
-			}
-			return obj;
-		},
-		getColumnData: function (columnHeader) {
-			for (var index = 0; index < this.numColumns; index++) {
-				if (this.columnHeaders[index] == columnHeader) break;
-			}
-			var data = [];
-			jQuery.extend(data, ArrayExtensions);
-			for (key in this.rows) {
-				data.push(this.rows[key][index]);
-			}
-			return data;
-		},
-		getCaption: function () {
-			return this.caption;
 		}
-	};
+		this.rowHeaders = tmpRowHeaders;
+		this.rows = tmpRows;
+		this.numRows = this.rowHeaders.length;
+		return this;
+	}
+	
+	TableData.prototype.getColumnSums = function () {
+		var arr = [];
+		$.extend(arr, ArrayExtensions);
+		for (var i = 0; i < this.numColumns; i++) arr.push(0);
+		
+		this.table.find('tbody tr').each(function (i, row) {
+			$(row).find('td').each(function (j, cell) {
+				var value = parseFloat($(cell).html());
+				arr[j] += value;
+			});
+		});
+		return arr;
+	}
+	
+	TableData.prototype.getDistributionByColumn = function () {
+		var arr = [];
+		$.extend(arr, ArrayExtensions);
+		var sums = this.getColumnSums();
+		var total = sums.sum();
+		for (var i = 0; i < this.numColumns; i++) arr.push((sums[i] / total) * 100);
+		return arr;
+	}
+	
+	TableData.prototype.getRowSums = function () {
+		var arr = [];
+		$.extend(arr, ArrayExtensions);
+		this.table.find('tbody tr').each(function (i, row) {
+			var sum = 0;
+			$(row).find('td').each(function (j, cell) {
+				var value = parseFloat($(cell).html());
+				sum += value;
+			});
+			arr.push(sum);
+		});
+		return arr;
+	}
+	
+	TableData.prototype.getDistributionByRow = function () {
+		var arr = [];
+		$.extend(arr, ArrayExtensions);
+		var sums = this.getRowSums();
+		var total = sums.sum();
+		for (var i = 0; i < this.numRows; i++) arr.push((sums[i] / total) * 100);
+		return arr;
+	}
+	
+	TableData.prototype.toString = function (colSep, rowSep) {
+		var arr = [];
+		$.extend(arr, ArrayExtensions);
+		for (var key in this.rows) {
+			arr.push(this.rows[key].round(1).join(colSep));
+		}
+		return arr.join(rowSep);
+	}
+	
+	TableData.prototype.getMax = function (options) {
+		var options = options || {};
+		if (options.isStacked) {
+			var globalMax = 0;
+			for (var i = 0; i < this.numColumns; i++) {
+				var sum = 0;
+				for (var key in this.rows) {
+					sum += this.rows[key][i];
+				}
+				if (sum > globalMax) globalMax = sum;
+			}
+			return globalMax;
+		} else {
+			var i = 0;
+			var globalMax;
+			for (var key in this.rows) {
+				var localMax = this.rows[key].max();
+				if (i == 0) {
+					globalMax = localMax;
+				} else if (localMax > globalMax) {
+					globalMax = localMax;
+				}
+				i++;
+			}
+			return globalMax;
+		}
+	}
+	
+	TableData.prototype.getColumnHeaders = function () {
+		return this.columnHeaders;
+	}
+	
+	TableData.prototype.getRowHeaders = function () {
+		return this.rowHeaders;
+	}
+	
+	TableData.prototype.getValueRowHeaders = function () {
+		return this.rows[this.rowHeaders[0]];
+	}
+	
+	TableData.prototype.getColumnHeadersIndices = function () {
+		var obj = {};
+		for (var i = 0; i < this.numColumns; i++) {
+			obj[this.columnHeaders[i]] = i;
+		}
+		return obj;
+	}
+	
+	TableData.prototype.getColumnData = function (columnHeader) {
+		for (var index = 0; index < this.numColumns; index++) {
+			if (this.columnHeaders[index] == columnHeader) break;
+		}
+		var data = [];
+		$.extend(data, ArrayExtensions);
+		for (key in this.rows) {
+			data.push(this.rows[key][index]);
+		}
+		return data;
+	}
+	
+	TableData.prototype.getCaption = function () {
+		return this.caption;
+	}
+	
 	$.fn.chartify = function( method ) {
 		if ( methods[method] ) {
 			return methods[ method ].apply( this, Array.prototype.slice.call( arguments, 1 ));
@@ -578,6 +683,6 @@
 		}    
 	};
 	$.fn.chartifyTableData = function (options) {
-		return new tableData($(this), options);
+		return new TableData($(this), options);
 	};
 })(jQuery);
