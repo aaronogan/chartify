@@ -102,7 +102,7 @@
 		imageClass: 	'',
 		unit: 			'',
 		labelType:      'none', // options are 'none', 'columnHeaders', 'rowHeaders'
-		legendType:     'none' // options are 'none', 'distribution', 'sum', 'rowHeader', 'columnHeader', 'extended'
+		legendType:     'none' // options are 'none', 'distribution', 'sum', 'columnHeader', 'extended'
 	};
 
 	var methods = {
@@ -245,7 +245,7 @@
 	Chart.prototype.initLabels = function () {
 		if (this.options.labelType != 'none') {
 			var formatter = new LabelFormatter(this.table);
-			var labels = formatter.formatColumns(this.options.labelType);
+			var labels = formatter.format(this.options.labelType);
 			this.params.chl = labels.join('|');
 		}
 	}
@@ -384,76 +384,32 @@
 	}
 
 	function LabelFormatter(tableData) {
-		this.table = tableData;
-		
-		this.columnHeaders = tableData.getColumnHeaders();
-		this.rowHeaders = tableData.getRowHeaders();
-		this.sums = tableData.getColumnSums();
-		this.distributions = tableData.getDistributionByRow();
-
 		// d for distribution
 		// l for literal
 		// s for sum
-		// r for row header
 		// c for column header
 		var knownFormats = {
 			distribution : '{d}{l:%}',
 			sum : '{s}',
-			rowHeader : '{r}',
 			columnHeader : '{c}',
 			extended : '{d}{l:%} {l:$}{s}'
 		};
 
-		this.formatRows = function (patternName) {
-			var results = [];
-			var rowHeaders = tableData.getRowHeaders();
-			var sums = tableData.getRowSums();
-			var pattern = knownFormats[patternName] || knownFormats['rowHeader'];
-			
-			console.log('formatRows');
-			return results;
-		}
-		
-		var rowCustomFormatString = function (pattern, rowHeader, rowSum, rowDistribution) {
-			var result = pattern;
-			var regex = /{.?:?.*?}/g;
-			var matches;
-			while ((matches = regex.exec(pattern)) != null) {
-				var parts = matches[0].replace('{', '').replace('}', '').split(':');
-				if (parts.length == 2 && parts[0] === 'l') {
-					result = result.replace(matches[0], parts[1]); // replace literal
-				} else if (parts.length == 1) {
-					if (parts[0] === 'r') {
-						result = result.replace(matches[0], rowHeader);
-					} else if (parts[0] === 'd') {
-						result = result.replace(matches[0], columnDistribution);
-					} else if (parts[0] === 's') {
-						result = result.replace(matches[0], columnSum);
-					} else if (parts[0] === 'c') {
-						throw new SyntaxError(pattern + ' cannot contain "{c}" in row formatting.');
-					}
-				} else {
-					throw new SyntaxError(pattern + ' is not a recognized format string.');
-				}
-			}
-			return result;
-		}
-
-		this.formatColumns = function (patternName) {
+		this.format = function (patternName) {
 			var results = [];
 			var columnHeaders = tableData.getColumnHeaders();
 			var sums = tableData.getColumnSums();
 			var distribution = tableData.getDistributionByColumn().round(2);
 			var pattern = knownFormats[patternName] || knownFormats['columnHeader'];
 			
-			for (var i = 0; i < this.table.numColumns; i++) {
-				var result = columnCustomFormatString(pattern, columnHeaders[i], sums[i], distribution[i]);
+			for (var i = 0; i < tableData.numColumns; i++) {
+				var result = customFormatString(pattern, columnHeaders[i], sums[i], distribution[i]);
 				results.push(result);
 			}
 			return results;
 		}
-		
-		var columnCustomFormatString = function (pattern, columnHeader, columnSum, columnDistribution) {
+
+		var customFormatString = function (pattern, columnHeader, columnSum, columnDistribution) {
 			var result = pattern;
 			var regex = /{.?:?.*?}/g;
 			var matches;
@@ -462,9 +418,7 @@
 				if (parts.length == 2 && parts[0] === 'l') {
 					result = result.replace(matches[0], parts[1]); // replace literal
 				} else if (parts.length == 1) {
-					if (parts[0] === 'r') {
-						throw new SyntaxError(pattern + ' cannot contain "{r}" in column formatting.');
-					} else if (parts[0] === 'd') {
+					if (parts[0] === 'd') {
 						result = result.replace(matches[0], columnDistribution);
 					} else if (parts[0] === 's') {
 						result = result.replace(matches[0], columnSum);
@@ -473,47 +427,6 @@
 					}
 				} else {
 					throw new SyntaxError(pattern + ' is not a recognized format string.');
-				}
-			}
-			return result;
-		}
-		
-
-		this.format = function (patternName) {
-			var pattern = knownFormats[patternName] || knownFormats['columnHeader'];
-			return this.customFormat(pattern);
-		}
-
-		this.customFormat = function (pattern) {
-			var results = [];
-			var x = this.rowHeaders.length;
-			var y = this.columnHeaders.length;
-			// TODO: Mechanism for determining which axis to use.
-			for (var i = 0; i < y; i++) {
-				var result = customFormatString(pattern, this.columnHeaders[i], this.rowHeaders[i], this.sums[i], this.distributions[i]);
-				results.push(result);
-			}
-			return results;
-		}
-
-		var customFormatString = function (pattern, columnHeader, rowHeader, sum, distribution) {
-			var result = pattern;
-			var regex = /{.?:?.*?}/g;
-			var matches;
-			while ((matches = regex.exec(pattern)) != null) {
-				var parts = matches[0].replace('{', '').replace('}', '').split(':');
-				if (parts.length == 2 && parts[0] === 'l') {
-					result = result.replace(matches[0], parts[1]); // replace literal
-				} else if (parts.length == 1) {
-					if (parts[0] === 'r') {
-						result = result.replace(matches[0], rowHeader);
-					} else if (parts[0] === 'd') {
-						result = result.replace(matches[0], distribution);
-					} else if (parts[0] === 's') {
-						result = result.replace(matches[0], sum);
-					} else if (parts[0] === 'c') {
-						result = result.replace(matches[0], columnHeader);
-					}
 				}
 			}
 			return result;
