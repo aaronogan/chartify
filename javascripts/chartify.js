@@ -146,7 +146,7 @@
 				var data = table.chartifyTableData({ isDistribution: mySettings.isDistribution });
 				var chart = new BarChart();
 				var imgUrl = chart.getImageUrl(data, mySettings);
-
+				
 				table.after('<img class="' + mySettings.imageClass + '" src="' + imgUrl + '" alt="" />');
 				table.attr('style', 'position: absolute; left: -9999px;');
 			});
@@ -257,7 +257,6 @@
 
 
 	function PieChart() { }
-
 	PieChart.prototype = new Chart();
 
 	PieChart.prototype.init = function (tableData, options) {
@@ -269,7 +268,6 @@
 
 
 	function PieChart3d() { }
-
 	PieChart3d.prototype = new PieChart();
 
 	PieChart3d.prototype.initChartType = function () {
@@ -300,7 +298,7 @@
 	}
 
 	BarChart.prototype.initLabels = function () {
-		if (this.labelType != 'none') {
+		if (this.options.labelType != 'none') {
 			var chm = '';
 			for(var i = 0; i < this.table.numRows; i++) {
 				if (i > 0) chm += '|';
@@ -362,7 +360,6 @@
 
 
 	function VennDiagram() { }
-
 	VennDiagram.prototype = new Chart();
 
 	VennDiagram.prototype.initChartType = function () {
@@ -385,31 +382,49 @@
 
 	function LabelFormatter(tableData) {
 		// d for distribution
-		// l for literal
 		// s for sum
 		// c for column header
+		// i for row index
 		var knownFormats = {
-			distribution : '{d}{l:%}',
+			distribution : '{d}%',
 			sum : '{s}',
-			columnHeader : '{c}',
-			extended : '{d}{l:%} {l:$}{s}'
+			columnHeader : '{h}',
+			header : '{h}',
+			extended : '{d}% ${s}'
 		};
 
 		this.format = function (patternName) {
+			var pattern = knownFormats[patternName] || knownFormats['columnHeader'];
+			return this.customFormat(pattern);
+		}
+		
+		this.customFormat = function (pattern) { // column-based
 			var results = [];
 			var columnHeaders = tableData.getColumnHeaders();
 			var sums = tableData.getColumnSums();
 			var distribution = tableData.getDistributionByColumn().round(2);
-			var pattern = knownFormats[patternName] || knownFormats['columnHeader'];
 			
 			for (var i = 0; i < tableData.numColumns; i++) {
-				var result = customFormatString(pattern, columnHeaders[i], sums[i], distribution[i]);
+				var result = customFormatString(pattern, columnHeaders[i], sums[i], distribution[i], i);
+				results.push(result);
+			}
+			return results;
+		}
+		
+		this.valueLabelFormat = function (pattern) { // row-based
+			var results = [];
+			var rowHeaders = tableData.getRowHeaders();
+			var sums = tableData.getRowSums();
+			var distribution = tableData.getDistributionByRow().round(2);
+			
+			for (var i = 0; i < tableData.numRows; i++) {
+				var result = customFormatString(pattern, rowHeaders[i], sums[i], distribution[i], i);
 				results.push(result);
 			}
 			return results;
 		}
 
-		var customFormatString = function (pattern, columnHeader, columnSum, columnDistribution) {
+		var customFormatString = function (pattern, header, sum, distribution, index) {
 			var result = pattern;
 			var regex = /{.?:?.*?}/g;
 			var matches;
@@ -419,11 +434,13 @@
 					result = result.replace(matches[0], parts[1]); // replace literal
 				} else if (parts.length == 1) {
 					if (parts[0] === 'd') {
-						result = result.replace(matches[0], columnDistribution);
+						result = result.replace(matches[0], distribution);
 					} else if (parts[0] === 's') {
-						result = result.replace(matches[0], columnSum);
-					} else if (parts[0] === 'c') {
-						result = result.replace(matches[0], columnHeader);
+						result = result.replace(matches[0], sum);
+					} else if (parts[0] === 'h') {
+						result = result.replace(matches[0], header);
+					} else if (parts[0] === 'i') {
+						result = result.replace(matches[0], index);
 					}
 				} else {
 					throw new SyntaxError(pattern + ' is not a recognized format string.');
